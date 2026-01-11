@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Task 2&4(merged as required): Error Handling and Retry Logic
+
+# Create directory for Pokémon data
+mkdir -p pokemon_data
+
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Function to fetch Pokémon data with retry logic
+fetch_pokemon_data() {
+    local pokemon=$1
+    local max_retries=3
+    local retry_count=0
+    
+    echo "Fetching data for $pokemon..."
+    
+    while [ $retry_count -lt $max_retries ]; do
+        # Add delay between requests (including retries)
+        sleep 1
+        
+        # Make API request
+        curl -s --max-time 10 \
+             "https://pokeapi.co/api/v2/pokemon/$pokemon" \
+             -H "Accept: application/json" \
+             -o "pokemon_data/${pokemon}.json.tmp"
+        
+        local exit_code=$?
+        
+        # Check if request was successful
+        if [ $exit_code -eq 0 ] && [ -s "pokemon_data/${pokemon}.json.tmp" ]; then
+            # Validate JSON response
+            if jq empty "pokemon_data/${pokemon}.json.tmp" 2>/dev/null; then
+                # Successful - move temp file to final location
+                mv "pokemon_data/${pokemon}.json.tmp" "pokemon_data/${pokemon}.json"
+                echo "Saved data to pokemon_data/${pokemon}.json ✅"
+                return 0
+            else
+                echo "Warning: Invalid JSON response for $pokemon (attempt $((retry_count + 1))/$max_retries)"
+            fi
+        else
+            # Handle different curl error codes
+            case $exit_code in
+                7)  error_msg="Failed to connect to server" ;;
+                28) error_msg="Request timeout" ;;
+                *)  error_msg="Failed with curl exit code: $exit_code" ;;
+            esac
+            echo "Warning: $error_msg for $pokemon (attempt $((retry_count + 1))/$max_retries)"
+        fi
+        
+        # Clean up temp file
+        rm -f "pokemon_data/${pokemon}.json.tmp"
+        
+        retry_count=$((retry_count + 1))
+        
+        # Exponential backoff for retries
+        if [ $retry_count -lt $max_retries ]; then
+            sleep $((retry_count * 2))
+        fi
+    done
+    
+    # All retries failed
+    echo "Error: Failed to fetch data for $pokemon after $max_retries attempts" >> errors.txt
+    echo "Failed to retrieve data for $pokemon ❌"
+    return 1
+}
+
+# Loop through each Pokémon
+for pokemon in "${pokemon_list[@]}"; do
+    fetch_pokemon_data "$pokemon"
+done
+
+# Summary
+echo ""
+echo "Batch processing complete."
+if [ -f "errors.txt" ] && [ -s "errors.txt" ]; then
+    echo "Some errors occurred. Check errors.txt for details."
+fi

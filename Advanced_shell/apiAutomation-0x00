@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Task 0: API Request Automation
+# Objective: Automate the process of making API requests to the Pokémon API
+# and saving the results to a file
+
+# Make API request to get Pikachu data
+curl -s "https://pokeapi.co/api/v2/pokemon/pikachu" \
+    -H "Accept: application/json" \
+    -o data.json
+
+# Check if the request was successful
+if [ $? -eq 0 ]; then
+    # Check if response is valid JSON and not empty
+    if jq empty data.json 2>/dev/null; then
+        echo "Successfully retrieved Pikachu data and saved to data.json"
+    else
+        echo "Failed to get valid response from API" >> errors.txt
+        echo "Error: Invalid JSON response" >> errors.txt
+        # Clean up invalid file
+        rm -f data.json
+    fi
+else
+    echo "Failed to connect to Pokémon API" >> errors.txt
+    echo "Error: curl command failed with exit code $?" >> errors.txt
+fi

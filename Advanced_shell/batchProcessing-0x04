@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Task 5: Parallel Data Fetching
+# Objective: Speed up data retrieval using parallel processing
+
+# Create directory for Pokémon data
+mkdir -p pokemon_data
+
+# List of Pokémon to fetch
+pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Array to store background process IDs
+pids=()
+
+# Function to fetch a single Pokémon in background
+fetch_pokemon_parallel() {
+    local pokemon=$1
+    local pid=$$
+    
+    # Add small random delay to avoid overwhelming the API
+    sleep $((RANDOM % 3))
+    
+    echo "Starting fetch for $pokemon (PID: $pid)..."
+    
+    # Make API request
+    curl -s --max-time 30 \
+         "https://pokeapi.co/api/v2/pokemon/$pokemon" \
+         -H "Accept: application/json" \
+         -o "pokemon_data/${pokemon}.json"
+    
+    local exit_code=$?
+    
+    # Check if request was successful
+    if [ $exit_code -eq 0 ] && [ -s "pokemon_data/${pokemon}.json" ]; then
+        # Validate JSON response
+        if jq empty "pokemon_data/${pokemon}.json" 2>/dev/null; then
+            echo "Completed: $pokemon ✅"
+        else
+            echo "Failed: Invalid JSON for $pokemon"
+            rm -f "pokemon_data/${pokemon}.json"
+        fi
+    else
+        echo "Failed: Could not fetch $pokemon (curl exit: $exit_code)"
+        rm -f "pokemon_data/${pokemon}.json"
+    fi
+}
+
+# Start all fetches in parallel
+echo "Starting parallel fetch for ${#pokemon_list[@]} Pokémon..."
+echo "=========================================="
+
+for pokemon in "${pokemon_list[@]}"; do
+    # Run fetch in background and store PID
+    fetch_pokemon_parallel "$pokemon" &
+    pids+=($!)
+done
+
+# Wait for all background processes to complete
+echo "=========================================="
+echo "Waiting for all processes to complete..."
+echo ""
+
+# Wait for each process and check exit status
+for pid in "${pids[@]}"; do
+    wait "$pid"
+    if [ $? -eq 0 ]; then
+        echo "Process $pid completed successfully"
+    else
+        echo "Process $pid failed"
+    fi
+done
+
+# Summary
+echo ""
+echo "=========================================="
+echo "Parallel processing complete!"
+echo ""
+
+# Count successful fetches
+success_count=0
+for pokemon in "${pokemon_list[@]}"; do
+    if [ -f "pokemon_data/${pokemon}.json" ]; then
+        success_count=$((success_count + 1))
+    fi
+done
+
+echo "Successfully fetched $success_count out of ${#pokemon_list[@]} Pokémon."

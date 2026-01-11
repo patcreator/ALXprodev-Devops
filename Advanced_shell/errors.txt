@@ -1,0 +1,7 @@
+Failed to get valid response from API
+Error: Invalid JSON response
+Error: Failed to fetch data for bulbasaur after 3 attempts
+Error: Failed to fetch data for ivysaur after 3 attempts
+Error: Failed to fetch data for venusaur after 3 attempts
+Error: Failed to fetch data for charmander after 3 attempts
+Error: Failed to fetch data for charmeleon after 3 attempts

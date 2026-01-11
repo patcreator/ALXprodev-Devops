@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Task 3: Summarize Pokémon Data
+# Objective: Create a report that summarizes data for multiple Pokémon
+
+# Check if pokemon_data directory exists
+if [ ! -d "pokemon_data" ]; then
+    echo "Error: pokemon_data directory not found. Run Task 2 first." >&2
+    exit 1
+fi
+
+# CSV file path
+csv_file="pokemon_report.csv"
+
+# Create CSV header
+echo "Name,Height (m),Weight (kg)" > "$csv_file"
+
+# Initialize counters for averages
+total_height=0
+total_weight=0
+count=0
+
+# Process each JSON file
+for json_file in pokemon_data/*.json; do
+    if [ -f "$json_file" ]; then
+        # Extract data using jq
+        name=$(jq -r '.name' "$json_file" | sed 's/.*/\u&/')
+        height=$(jq -r '.height / 10' "$json_file")
+        weight=$(jq -r '.weight / 10' "$json_file")
+        
+        # Add to CSV
+        echo "$name,$height,$weight" >> "$csv_file"
+        
+        # Add to totals for averages
+        total_height=$(echo "$total_height + $height" | bc)
+        total_weight=$(echo "$total_weight + $weight" | bc)
+        count=$((count + 1))
+    fi
+done
+
+# Display the CSV file
+echo "CSV Report generated at: $csv_file"
+echo ""
+cat "$csv_file"
+echo ""
+
+# Calculate averages using awk
+if [ $count -gt 0 ]; then
+    avg_height=$(echo "scale=2; $total_height / $count" | bc)
+    avg_weight=$(echo "scale=2; $total_weight / $count" | bc)
+    
+    echo "Average Height: $avg_height m"
+    echo "Average Weight: $avg_weight kg"
+else
+    echo "No Pokémon data found to calculate averages."
+fi
