@@ -11,14 +11,14 @@ fi
 
 # Extract data using jq and format with sed
 name=$(jq -r '.name' data.json | sed 's/.*/\u&/')  # Capitalize first letter
-height=$(jq -r '.height / 10' data.json)  # Convert from decimeters to meters
-weight=$(jq -r '.weight / 10' data.json)  # Convert from hectograms to kg
+formatted_height=$(jq -r '.height / 10' data.json)  # Convert from decimeters to meters
+formatted_weight=$(jq -r '.weight / 10' data.json)  # Convert from hectograms to kg
 
 # Extract type(s) - get all types and join them with comma
 # Using jq, awk, and sed as required
-types=$(jq -r '.types[] | .type.name' data.json | \
+type=$(jq -r '.types[] | .type.name' data.json | \
         awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}' | \
         sed 'N;s/\n/, /; s/, $//')
 
 # Format and display the output
-echo "${name} is of type ${types}, weighs ${weight}kg, and is ${height}m tall."
+echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
