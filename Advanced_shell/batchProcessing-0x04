@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Task 5: Parallel Data Fetching
-# Objective: Speed up data retrieval using parallel processing
+# Task 5: Parallel Data Fetching (Advanced with timeout and kill)
+# Objective: Speed up data retrieval using parallel processing,
+# monitor background jobs, and terminate stuck processes
 
 # Create directory for Pokémon data
 mkdir -p pokemon_data
@@ -9,21 +10,20 @@ mkdir -p pokemon_data
 # List of Pokémon to fetch
 pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Array to store background process IDs
-pids=()
+# Timeout for each fetch (in seconds)
+FETCH_TIMEOUT=15
 
-# Function to fetch a single Pokémon in background
+# Function to fetch a single Pokémon
 fetch_pokemon_parallel() {
     local pokemon=$1
-    local pid=$$
     
     # Add small random delay to avoid overwhelming the API
     sleep $((RANDOM % 3))
     
-    echo "Starting fetch for $pokemon (PID: $pid)..."
+    echo "Starting fetch for $pokemon (PID: $$)..."
     
     # Make API request
-    curl -s --max-time 30 \
+    curl -s --max-time $FETCH_TIMEOUT \
          "https://pokeapi.co/api/v2/pokemon/$pokemon" \
          -H "Accept: application/json" \
          -o "pokemon_data/${pokemon}.json"
@@ -50,33 +50,39 @@ echo "Starting parallel fetch for ${#pokemon_list[@]} Pokémon..."
 echo "=========================================="
 
 for pokemon in "${pokemon_list[@]}"; do
-    # Run fetch in background and store PID
     fetch_pokemon_parallel "$pokemon" &
-    pids+=($!)
 done
 
-# Wait for all background processes to complete
-echo "=========================================="
-echo "Waiting for all processes to complete..."
+# Show running background jobs
+echo ""
+echo "Current background jobs:"
+jobs
 echo ""
 
-# Wait for each process and check exit status
-for pid in "${pids[@]}"; do
-    wait "$pid"
-    if [ $? -eq 0 ]; then
-        echo "Process $pid completed successfully"
-    else
-        echo "Process $pid failed"
+# Monitor jobs with timeout and kill stuck processes
+while true; do
+    running_jobs=$(jobs -rp)  # get PIDs of running jobs
+    if [ -z "$running_jobs" ]; then
+        break
     fi
+
+    for pid in $running_jobs; do
+        # Check elapsed time for each job
+        elapsed=$(ps -o etimes= -p "$pid" 2>/dev/null)
+        if [ -n "$elapsed" ] && [ "$elapsed" -gt $FETCH_TIMEOUT ]; then
+            echo "Process $pid exceeded timeout ($FETCH_TIMEOUT s). Killing..."
+            kill -9 "$pid" 2>/dev/null
+        fi
+    done
+
+    sleep 1
 done
 
-# Summary
-echo ""
 echo "=========================================="
-echo "Parallel processing complete!"
+echo "All background fetches completed!"
 echo ""
 
-# Count successful fetches
+# Summary of successful fetches
 success_count=0
 for pokemon in "${pokemon_list[@]}"; do
     if [ -f "pokemon_data/${pokemon}.json" ]; then
